@@ -20,8 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $dest_path = $uploadFileDir . $fileName;
 
             if (move_uploaded_file($fileTmpPath, $dest_path)) {
+
+                $host = 'mysql-fabricare.alwaysdata.net';
+                $dbname = 'fabricare_fabri_care';
+                $username = 'fabricare';
+                $password = 'fabri123';
                 // Database connection
-                $conn = new mysqli('localhost', 'root', '', 'fabri-care');
+                $conn = new mysqli($host, $username, $password, $dbname);
 
                 // Check connection
                 if ($conn->connect_error) {

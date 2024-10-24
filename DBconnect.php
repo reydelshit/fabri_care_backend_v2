@@ -15,16 +15,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 class DbConnect
 {
-    // private $server = 'mysql-fabricare.alwaysdata.net';
-    // private $dbname = 'fabricare_fabri_care';
-    // private $user = 'fabricare';
-    // private $pass = 'fabri123';
+    private $server = 'mysql-fabricare.alwaysdata.net';
+    private $dbname = 'fabricare_fabri_care';
+    private $user = 'fabricare';
+    private $pass = 'fabri123';
 
-    private $server = 'localhost';
-    private $dbname = 'fabri_care';
+    // private $server = 'localhost';
+    // private $dbname = 'fabri_care';
 
-    private $user = 'root';
-    private $pass = '';
+    // private $user = 'root';
+    // private $pass = '';
 
     public function connect()
     {

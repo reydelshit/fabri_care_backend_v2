@@ -9,37 +9,43 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case "GET":
-
-
-        $month = $_GET['month'];
+        $filterByWhat = $_GET['filterByWhat'];
+        $filterValue = $_GET['filterValue'];
 
         $sql = "SELECT 
-            ins.fabric_type AS name,
+            fabric_types.fabric_type AS name,
             COALESCE(COUNT(img.fabric), 0) AS value
         FROM 
-            instructions ins
+            (SELECT DISTINCT fabric_type 
+             FROM instructions 
+             WHERE fabric_type IS NOT NULL) AS fabric_types
         LEFT JOIN 
-            image img ON ins.fabric_type = img.fabric AND DATE_FORMAT(img.image_uploadDate, '%M') = :month
-            GROUP BY 
-                ins.fabric_type
-            ORDER BY 
-                value DESC;
-            ";
-
-
+            image img ON fabric_types.fabric_type = img.fabric 
+            AND CASE 
+                WHEN :filterByWhat = 'Daily' THEN DAYNAME(img.image_uploadDate) = :filterValue
+                WHEN :filterByWhat = 'Monthly' THEN DATE_FORMAT(img.image_uploadDate, '%M') = :filterValue
+                WHEN :filterByWhat = 'Yearly' THEN YEAR(img.image_uploadDate) = :filterValue
+            END
+        GROUP BY 
+            fabric_types.fabric_type
+        ORDER BY 
+            value DESC";
 
         if (isset($sql)) {
-            $stmt = $conn->prepare($sql);
+            try {
+                $stmt = $conn->prepare($sql);
 
-            $stmt->bindParam(':month', $month);
+                $stmt->bindParam(':filterByWhat', $filterByWhat);
+                $stmt->bindParam(':filterValue', $filterValue);
 
+                $stmt->execute();
+                $fabrics = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $stmt->execute();
-            $fabric = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            echo json_encode($fabric);
+                echo json_encode($fabrics);
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            }
         }
-
-
         break;
 }

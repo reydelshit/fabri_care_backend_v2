@@ -9,9 +9,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case "GET":
-
-
-        $month = $_GET['month'];
+        $filterByWhat = $_GET['filterByWhat'];
+        $filterValue = $_GET['filterValue'];
 
         $sql = "SELECT 
             stains.stain_type AS name,
@@ -26,27 +25,31 @@ switch ($method) {
             UNION ALL SELECT 'Marker') AS stains
         LEFT JOIN 
             image img ON stains.stain_type = img.stain 
-            AND DATE_FORMAT(img.image_uploadDate, '%M') = :month
+            AND CASE 
+                WHEN :filterByWhat = 'Daily' THEN DAYNAME(img.image_uploadDate) = :filterValue
+                WHEN :filterByWhat = 'Monthly' THEN DATE_FORMAT(img.image_uploadDate, '%M') = :filterValue
+                WHEN :filterByWhat = 'Yearly' THEN YEAR(img.image_uploadDate) = :filterValue
+            END
         GROUP BY 
             stains.stain_type
         ORDER BY 
-            value DESC;;
-            ";
-
-
+            value DESC";
 
         if (isset($sql)) {
-            $stmt = $conn->prepare($sql);
+            try {
+                $stmt = $conn->prepare($sql);
 
-            $stmt->bindParam(':month', $month);
+                $stmt->bindParam(':filterByWhat', $filterByWhat);
+                $stmt->bindParam(':filterValue', $filterValue);
 
+                $stmt->execute();
+                $stains = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $stmt->execute();
-            $fabric = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            echo json_encode($fabric);
+                echo json_encode($stains);
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            }
         }
-
-
         break;
 }

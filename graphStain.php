@@ -9,47 +9,58 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case "GET":
-        $filterByWhat = $_GET['filterByWhat'];
-        $filterValue = $_GET['filterValue'];
-
+        // Base SQL query with optional date filtering
         $sql = "SELECT 
-            stains.stain_type AS name,
-            COALESCE(COUNT(img.stain), 0) AS value
-        FROM 
-            (SELECT 'blood' AS stain_type
-            UNION ALL SELECT 'Chocolate'
-            UNION ALL SELECT 'Coffee'
-            UNION ALL SELECT 'Grass'
-            UNION ALL SELECT 'Grease'
-            UNION ALL SELECT 'Ketchup'
-            UNION ALL SELECT 'Marker') AS stains
-        LEFT JOIN 
-            image img ON stains.stain_type = img.stain 
-            AND CASE 
-                WHEN :filterByWhat = 'Daily' THEN DAYNAME(img.image_uploadDate) = :filterValue
-                WHEN :filterByWhat = 'Monthly' THEN DATE_FORMAT(img.image_uploadDate, '%M') = :filterValue
-                WHEN :filterByWhat = 'Yearly' THEN YEAR(img.image_uploadDate) = :filterValue
-            END
-        GROUP BY 
-            stains.stain_type
-        ORDER BY 
-            value DESC";
+                    stains.stain_type AS name,
+                    COALESCE(COUNT(img.stain), 0) AS value
+                FROM 
+                    (SELECT 'blood' AS stain_type
+                    UNION ALL SELECT 'chocolate'
+                    UNION ALL SELECT 'coffee'
+                    UNION ALL SELECT 'grass'
+                    UNION ALL SELECT 'grease'
+                    UNION ALL SELECT 'ketchup'
+                    UNION ALL SELECT 'marker') AS stains
+                LEFT JOIN 
+                    image img ON stains.stain_type = img.stain";
 
-        if (isset($sql)) {
-            try {
-                $stmt = $conn->prepare($sql);
+        // Initialize an empty conditions array for the WHERE clause
+        $conditions = [];
 
-                $stmt->bindParam(':filterByWhat', $filterByWhat);
-                $stmt->bindParam(':filterValue', $filterValue);
+        // Add date conditions if startDate and/or endDate are set
+        if (isset($_GET['startDate']) && !empty($_GET['startDate'])) {
+            $conditions[] = "img.image_uploadDate >= :startDate";
+        }
+        if (isset($_GET['endDate']) && !empty($_GET['endDate'])) {
+            $conditions[] = "img.image_uploadDate <= :endDate";
+        }
 
-                $stmt->execute();
-                $stains = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Append conditions to the SQL query if any exist
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $conditions);
+        }
 
-                echo json_encode($stains);
-            } catch (PDOException $e) {
-                http_response_code(500);
-                echo json_encode(['error' => $e->getMessage()]);
+        // Group by and order clause
+        $sql .= " GROUP BY stains.stain_type ORDER BY value DESC";
+
+        try {
+            $stmt = $conn->prepare($sql);
+
+            // Bind the date parameters if present
+            if (isset($_GET['startDate']) && !empty($_GET['startDate'])) {
+                $stmt->bindParam(':startDate', $_GET['startDate']);
             }
+            if (isset($_GET['endDate']) && !empty($_GET['endDate'])) {
+                $stmt->bindParam(':endDate', $_GET['endDate']);
+            }
+
+            $stmt->execute();
+            $stains = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode($stains);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
         }
         break;
 }

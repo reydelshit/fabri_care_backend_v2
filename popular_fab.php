@@ -7,29 +7,27 @@ $conn = $objDB->connect();
 date_default_timezone_set('Asia/Manila');
 $method = $_SERVER['REQUEST_METHOD'];
 
-
 switch ($method) {
     case "GET":
-        // Base SQL query with optional date filtering
         $sql = "SELECT 
-                    fabric_types.fabric_type AS name,
-                    COALESCE(COUNT(img.fabric), 0) AS value
+                    image.fabric, 
+                    image.stain, 
+                    COUNT(*) AS combination_count,
+                    instructions.washing_instructions
                 FROM 
-                    (SELECT DISTINCT fabric_type 
-                    FROM instructions 
-                    WHERE fabric_type IS NOT NULL) AS fabric_types
+                    image
                 LEFT JOIN 
-                    image img ON fabric_types.fabric_type = img.fabric";
+                    instructions ON image.fabric = instructions.fabric_type";
 
-        // Initialize an empty conditions array for the WHERE clause
+        // Initialize an array to build conditional WHERE clauses
         $conditions = [];
 
-        // Add date conditions if startDate and/or endDate are set
+        // Check if startDate and endDate are set and add them to the conditions
         if (isset($_GET['startDate']) && !empty($_GET['startDate'])) {
-            $conditions[] = "img.image_uploadDate >= :startDate";
+            $conditions[] = "image.image_uploadDate >= :startDate";
         }
         if (isset($_GET['endDate']) && !empty($_GET['endDate'])) {
-            $conditions[] = "img.image_uploadDate <= :endDate";
+            $conditions[] = "image.image_uploadDate <= :endDate";
         }
 
         // Append conditions to the SQL query if any exist
@@ -37,13 +35,13 @@ switch ($method) {
             $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
-        // Group by and order clause
-        $sql .= " GROUP BY fabric_types.fabric_type ORDER BY value DESC";
+        // Group by and order clauses
+        $sql .= " GROUP BY image.fabric ORDER BY combination_count DESC";
 
         try {
             $stmt = $conn->prepare($sql);
 
-            // Bind the date parameters if present
+            // Bind parameters only if they are set
             if (isset($_GET['startDate']) && !empty($_GET['startDate'])) {
                 $stmt->bindParam(':startDate', $_GET['startDate']);
             }
@@ -52,9 +50,9 @@ switch ($method) {
             }
 
             $stmt->execute();
-            $fabricTypes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            echo json_encode($fabricTypes);
+            echo json_encode($history);
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
